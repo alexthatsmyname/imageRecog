@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Flower Recognition & Chat</title>
+  <style>
+    /* Stilizare generală pentru o interfață modernă */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+      width: 100%;
+      max-width: 700px;
+      padding: 30px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #555;
+    }
+
+    input[type="file"] {
+      display: block;
+      margin-bottom: 15px;
+    }
+
+    button {
+      background-color: #3498db;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    #previewImg {
+      width: 100%;
+      max-height: 400px;
+      object-fit: contain;
+      display: none;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      margin-bottom: 15px;
+    }
+
+    #errorMsg {
+      color: #e74c3c;
+      font-weight: bold;
+      margin-bottom: 15px;
+      display: none;
+    }
+
+    #result, #chatSection {
+      margin-top: 25px;
+      display: none;
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    /* Stilizare pentru zona de chat */
+    .chat-box {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #f9f9f9;
+      padding: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-bottom: 15px;
+    }
+
+    .chat-line {
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bubble {
+      padding: 10px 15px;
+      border-radius: 20px;
+      max-width: 80%;
+      word-break: break-word;
+    }
+
+    .user {
+      align-self: flex-end;
+      background-color: #dbeffc;
+      color: #333;
+    }
+
+    .assistant {
+      align-self: flex-start;
+      background-color: #e8ffd8;
+      color: #333;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Input de întrebare */
+    #questionInput {
+      width: calc(100% - 110px);
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      margin-right: 10px;
+    }
+
+    .chat-input {
+      display: flex;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Flower Recognition & Chat</h1>
+
+    <div>
+      <label for="fileInput">Încarcă imaginea cu floarea:</label>
+      <input type="file" id="fileInput" accept="image/*" />
+      <img id="previewImg" alt="Previzualizare Imagine" />
+    </div>
+
+    <button id="predictBtn">Predict</button>
+
+    <div id="errorMsg"></div>
+
+    <div id="result">
+      <h3>Rezultat clasificare</h3>
+      <p><strong>Floare prezisă:</strong> <span id="predFlower"></span></p>
+      <p><strong>Confidență:</strong> <span id="predConf"></span></p>
+    </div>
+
+    <div id="chatSection">
+      <h3>Întreabă despre floare</h3>
+      <div class="chat-box" id="chatBox"></div>
+      <div class="chat-input">
+        <input type="text" id="questionInput" placeholder="Întreabă ceva despre floare..." />
+        <button id="askBtn">Trimite</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const previewImg = document.getElementById("previewImg");
+    const predictBtn = document.getElementById("predictBtn");
+    const errorMsg = document.getElementById("errorMsg");
+    const resultDiv = document.getElementById("result");
+    const predFlower = document.getElementById("predFlower");
+    const predConf = document.getElementById("predConf");
+    const chatSection = document.getElementById("chatSection");
+    const chatBox = document.getElementById("chatBox");
+    const questionInput = document.getElementById("questionInput");
+    const askBtn = document.getElementById("askBtn");
+
+    let currentFlowerName = null;
+
+    fileInput.addEventListener("change", () => {
+      if (!fileInput.files.length) return;
+      const file = fileInput.files[0];
+      previewImg.src = URL.createObjectURL(file);
+      previewImg.style.display = "block";
+      errorMsg.style.display = "none";
+      resultDiv.style.display = "none";
+      chatSection.style.display = "none";
+    });
+
+    predictBtn.addEventListener("click", async () => {
+      if (!fileInput.files.length) {
+        showError("Selectează un fișier!");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+      try {
+        const res = await fetch("/predict", {
+          method: "POST",
+          body: formData
+        });
+        const data = await res.json();
+        if (data.error) {
+          showError(data.error);
+          return;
+        }
+        predFlower.textContent = data.flower_class;
+        predConf.textContent = (data.confidence * 100).toFixed(2) + "%";
+        resultDiv.style.display = "block";
+        chatSection.style.display = "block";
+        currentFlowerName = data.flower_class;
+        chatBox.innerHTML = "";
+      } catch (err) {
+        showError("Eroare: " + err.message);
+      }
+    });
+
+    askBtn.addEventListener("click", async () => {
+      const question = questionInput.value.trim();
+      if (!question || !currentFlowerName) return;
+      appendChat("user", question);
+      questionInput.value = "";
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question: question,
+            flower_name: currentFlowerName
+          })
+        });
+        const data = await res.json();
+        if (data.error) {
+          appendChat("assistant", "Eroare: " + data.error);
+        } else {
+          appendChat("assistant", data.answer);
+        }
+      } catch (err) {
+        appendChat("assistant", "Eroare: " + err.message);
+      }
+    });
+
+    function showError(msg) {
+      errorMsg.textContent = msg;
+      errorMsg.style.display = "block";
+      resultDiv.style.display = "none";
+      chatSection.style.display = "none";
+    }
+
+    function appendChat(role, text) {
+      const line = document.createElement("div");
+      line.className = "chat-line";
+      if (role === "user") {
+        line.innerHTML = `<div class="bubble user">${text}</div>`;
+      } else {
+        line.innerHTML = `<div class="bubble assistant">${text}</div>`;
+      }
+      chatBox.appendChild(line);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>
