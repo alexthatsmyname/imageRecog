@@ -8,13 +8,13 @@ import numpy as np
 
 app = Flask(__name__)
 
-# Setează cheia de API OpenAI (ideal din variabila de mediu OPENAI_API_KEY)
+
 openai.api_key = os.getenv("OPENAI_API_KEY", "your_openai_api_key_here")
 
-# Încarcă modelul salvat
+
 model = tf.keras.models.load_model("flower_model.h5")
 
-# Încarcă mapping-ul din fișierul JSON și convertește-l într-o listă sortată
+
 with open("class_names.json", "r", encoding="utf-8") as f:
     mapping_dict = json.load(f)
 sorted_keys = sorted(mapping_dict, key=lambda x: int(x))
